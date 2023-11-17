@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# Set AWS Region
+aws_region="us-west-2"
+echo "AWS Region: $aws_region"
+echo "aws_region = \"$aws_region\"" > terraform.tfvars
+
+# Function to select a VPC
+select_vpc() {
+    echo "Fetching VPCs..."
+    mapfile -t vpcs < <(aws ec2 describe-vpcs --query "Vpcs[*].[VpcId,Tags[?Key=='Name'].Value | [0]]" --output text --region $aws_region)
+
+    echo "Available VPCs:"
+    select vpc_option in "${vpcs[@]}"; do
+        vpc_id=$(echo $vpc_option | awk '{print $1}')
+        break
+    done
+}
+
+# Function to select a Subnet
+select_subnet() {
+    echo "Fetching Subnets for VPC $vpc_id..."
+    mapfile -t subnets < <(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$vpc_id" --query "Subnets[*].[SubnetId]" --output text --region $aws_region)
+
+    echo "Available Subnets in VPC $vpc_id:"
+    select subnet_option in "${subnets[@]}"; do
+        subnet_id=$subnet_option
+        break
+    done
+}
+
+# Function to find Ubuntu 22.04 AMI
+find_ubuntu_ami() {
+    echo "Searching for Ubuntu 22.04 AMI..."
+    ami_id=$(aws ec2 describe-images --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*" "Name=state,Values=available" --query "Images | sort_by(@, &CreationDate) | [-1].ImageId" --output text --region $aws_region)
+    echo "Selected AMI: $ami_id"
+}
+
+# Run functions
+select_vpc
+select_subnet
+find_ubuntu_ami
+
+# Update terraform.tfvars file
+echo "vpc_name_tag = \"$vpc_id\"" >> terraform.tfvars
+echo "subnet_tag_key = \"SubnetId\"" >> terraform.tfvars
+echo "subnet_tag_value = \"$subnet_id\"" >> terraform.tfvars
+echo "ami_id = \"$ami_id\"" >> terraform.tfvars
+echo "instance_type = \"t2.micro\"" >> terraform.tfvars
+
+echo "terraform.tfvars updated successfully."

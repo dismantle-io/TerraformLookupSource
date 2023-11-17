@@ -1,0 +1,6 @@
+aws_region       = "us-west-2"
+vpc_name_tag     = "YourVPCName"
+subnet_tag_key   = "SubnetTagKey"
+subnet_tag_value = "SubnetTagValue"
+ami_id           = "ami-12345678"
+instance_type    = "t2.micro"
